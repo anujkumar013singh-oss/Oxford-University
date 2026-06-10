@@ -3,31 +3,31 @@ const app = require('../app');
 const connectDB = require('../config/db');
 const Admin = require('../models/Admin');
 
-let ready = false;
+let connectionPromise = null;
 
-const init = async () => {
-  try {
-    await connectDB();
-    const existing = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
-    if (!existing) {
-      await Admin.create({
-        email: process.env.ADMIN_EMAIL,
-        password: process.env.ADMIN_PASSWORD,
-        name: 'Admin'
-      });
-    }
-    ready = true;
-  } catch (e) {
-    console.error('Init error:', e.message);
+const getConnection = () => {
+  if (!connectionPromise) {
+    connectionPromise = (async () => {
+      await connectDB();
+      const existing = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
+      if (!existing) {
+        await Admin.create({
+          email: process.env.ADMIN_EMAIL,
+          password: process.env.ADMIN_PASSWORD,
+          name: 'Admin'
+        });
+      }
+    })();
   }
+  return connectionPromise;
 };
 
-init();
-
 module.exports = async (req, res) => {
-  if (!ready) {
-    res.status(503).json({ success: false, error: 'Server initializing, try again' });
-    return;
+  try {
+    await getConnection();
+    return app(req, res);
+  } catch (e) {
+    console.error('Init error:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
-  return app(req, res);
 };
