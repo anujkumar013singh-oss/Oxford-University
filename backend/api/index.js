@@ -3,10 +3,11 @@ const app = require('../app');
 const connectDB = require('../config/db');
 const Admin = require('../models/Admin');
 
-let connected = false;
+let ready = false;
 
-const seedAdmin = async () => {
+const init = async () => {
   try {
+    await connectDB();
     const existing = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
     if (!existing) {
       await Admin.create({
@@ -15,16 +16,18 @@ const seedAdmin = async () => {
         name: 'Admin'
       });
     }
+    ready = true;
   } catch (e) {
-    console.error('Seed admin error:', e.message);
+    console.error('Init error:', e.message);
   }
 };
 
+init();
+
 module.exports = async (req, res) => {
-  if (!connected) {
-    await connectDB();
-    await seedAdmin();
-    connected = true;
+  if (!ready) {
+    res.status(503).json({ success: false, error: 'Server initializing, try again' });
+    return;
   }
   return app(req, res);
 };
